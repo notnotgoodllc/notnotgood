@@ -187,6 +187,15 @@
 
 const REDIRECT_URL = "https://notnotgood.kit.com/d5acb4e9b2";
 
+// Google Apps Script Web App URL — paste the /exec URL you get after deploying
+// the Apps Script (see the setup notes). Leave "" to disable syncing.
+const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbwIvLoB6f0r0-uRn8-NlTDL5stz-mH8rpAXevQbRHuAgzOh8XyNfRNT6HthsN4dwDms/exec";
+
+// One id per visit, so every incremental save updates the SAME spreadsheet row.
+const responseId = (crypto && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : "r" + Date.now() + Math.random().toString(36).slice(2);
+
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
   "Delaware","District of Columbia","Florida","Georgia","Hawaii","Idaho","Illinois",
@@ -582,6 +591,7 @@ function wireBack() {
 
 function go(id) {
   if (id === "__done") return finish();
+  syncProgress("in_progress");   // save whatever has been answered so far
   history.push(currentId);
   render(id);
 }
@@ -603,10 +613,11 @@ function terminate() {
          trân trọng sự quan tâm của bạn. Chúc bạn một ngày tốt lành!</p>
     </div>`;
   footer.textContent = "";
+  syncProgress("terminated");
 }
 
 function finish() {
-  saveResponse();
+  syncProgress("completed");
   progressBar.style.width = "100%";
   stage.innerHTML = `
     <div class="center-msg">
@@ -618,19 +629,56 @@ function finish() {
   setTimeout(() => { window.location.href = REDIRECT_URL; }, 1400);
 }
 
-// Static site: no backend. Persist the response locally so it isn't lost,
-// and expose a hook where a real endpoint could be wired in later.
-function saveResponse() {
-  answers.completed_at = new Date().toISOString();
-  try {
-    const key = "manga_survey_responses";
-    const all = JSON.parse(localStorage.getItem(key) || "[]");
-    all.push(answers);
-    localStorage.setItem(key, JSON.stringify(all));
-  } catch (e) { /* storage unavailable — ignore */ }
+// Build a flat, human-readable row from the current answers.
+function buildRow(status) {
+  return {
+    id: responseId,
+    status: status,
+    updated_at: new Date().toISOString(),
+    us_resident: answers.S1_label || "",
+    state: answers.S1b || "",
+    vi_relationship: answers.S2_label || "",
+    manga_frequency: answers.S3_label || "",
+    reads_vi_manga: answers.S4_label || "",
+    path: answers.A1 !== undefined ? "A — reads VI manga"
+        : answers.B1 !== undefined ? "B — interested"
+        : "",
+    manga_spend: answers.A1_label || answers.B2_label || "",
+    acquisition: withOther(answers.A2_label || answers.B3_label, answers.A2_other || answers.B3_other),
+    barrier: withOther(answers.A3_label || answers.B1_label, answers.A3_other || answers.B1_other),
+    email: answers.email || "",
+    wishlist: answers.C2 || "",
+  };
+}
 
-  // To collect responses centrally, POST `answers` to your endpoint here, e.g.:
-  // navigator.sendBeacon("/api/survey", JSON.stringify(answers));
+function withOther(label, other) {
+  if (!label) return "";
+  return other ? (label + " " + other) : label;
+}
+
+// Save progress to the spreadsheet after each step. Fire-and-forget: `no-cors`
+// + text/plain avoids a CORS preflight (Apps Script can't send CORS headers),
+// and `keepalive` lets the last save finish as the page redirects away.
+function syncProgress(status) {
+  // Nothing answered yet (still on intro) — skip creating an empty row.
+  if (status === "in_progress" && answers.S1 === undefined) return;
+
+  const row = buildRow(status);
+
+  // Local safety-net copy.
+  try { localStorage.setItem("manga_survey_" + responseId, JSON.stringify(row)); }
+  catch (e) { /* storage unavailable — ignore */ }
+
+  if (!SHEET_ENDPOINT) return;
+  try {
+    fetch(SHEET_ENDPOINT, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(row),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) { /* fetch unavailable — ignore */ }
 }
 
 // ---- Utils ----------------------------------------------------------------
