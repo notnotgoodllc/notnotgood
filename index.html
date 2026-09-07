@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Khảo sát độc giả manga tiếng Việt</title>
+<style>
+  :root {
+    --bg: #faf7f2;
+    --card: #ffffff;
+    --ink: #1f2733;
+    --muted: #667085;
+    --line: #e5e0d8;
+    --brand: #c0392b;
+    --brand-dark: #96271a;
+    --accent: #f4ede1;
+    --ok: #2e7d54;
+    --radius: 14px;
+    --shadow: 0 6px 24px rgba(31, 39, 51, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 18px 64px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header { text-align: center; margin-bottom: 18px; }
+  header .eyebrow {
+    font-size: 13px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--brand);
+    font-weight: 700;
+  }
+  header h1 { font-size: 20px; margin: 6px 0 0; }
+
+  .progress {
+    height: 6px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 8px 0 22px;
+  }
+  .progress > span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: var(--brand);
+    transition: width .35s ease;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 26px 22px;
+  }
+
+  .intro p { color: var(--muted); }
+  .intro .lead { color: var(--ink); font-size: 16px; }
+
+  .qtag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--brand);
+    background: var(--accent);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin-bottom: 12px;
+  }
+  .qtext { font-size: 18px; font-weight: 650; margin: 0 0 4px; }
+  .qhint { font-size: 13px; color: var(--muted); margin: 0 0 18px; }
+
+  .pitch-title { font-size: 24px; font-weight: 750; line-height: 1.3; margin: 4px 0 14px; }
+  .pitch-body { font-size: 17px; color: var(--ink); margin: 0 0 22px; }
+  .pitch-label { display: block; font-size: 14px; font-weight: 650; margin-bottom: 2px; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .opt {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 13px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: #fff;
+  }
+  .opt:hover { border-color: #cbb9a6; background: #fffdf9; }
+  .opt input { margin-top: 3px; accent-color: var(--brand); width: 17px; height: 17px; flex: 0 0 auto; }
+  .opt.checked { border-color: var(--brand); background: #fdf3f1; }
+  .opt .txt { font-size: 15px; }
+
+  .other-input, .text-input, select, input[type="email"] {
+    width: 100%;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--ink);
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 11px 12px;
+    margin-top: 8px;
+    background: #fff;
+  }
+  .other-input { margin-top: 6px; margin-left: 29px; width: calc(100% - 29px); }
+  select:focus, input:focus, textarea:focus, .other-input:focus {
+    outline: none; border-color: var(--brand);
+  }
+  textarea.text-input { min-height: 96px; resize: vertical; }
+
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 22px;
+  }
+  button {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 650;
+    border-radius: 10px;
+    padding: 12px 22px;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: background .15s, opacity .15s;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-dark); }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--muted); border-color: var(--line); }
+  .btn-ghost:hover { color: var(--ink); border-color: #cbb9a6; }
+
+  .center-msg { text-align: center; }
+  .center-msg .emoji { font-size: 40px; }
+  .center-msg h2 { margin: 12px 0 8px; }
+  .center-msg p { color: var(--muted); }
+
+  .spinner {
+    width: 34px; height: 34px;
+    border: 3px solid var(--line);
+    border-top-color: var(--brand);
+    border-radius: 50%;
+    margin: 8px auto 14px;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { text-align: center; margin-top: 20px; font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 480px) {
+    .card { padding: 22px 16px; }
+    .qtext { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Hiệu sách manga &amp; văn học tiếng Việt</div>
+    <h1>Khảo sát độc giả</h1>
+  </header>
+
+  <div class="progress" id="progressBar" hidden><span></span></div>
+
+  <main id="stage" class="card"></main>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+"use strict";
+
+const REDIRECT_URL = "https://notnotgood.kit.com/d5acb4e9b2";
+
+const US_STATES = [
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
+  "Delaware","District of Columbia","Florida","Georgia","Hawaii","Idaho","Illinois",
+  "Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts",
+  "Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
+  "New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota",
+  "Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina",
+  "South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington",
+  "West Virginia","Wisconsin","Wyoming"
+];
+
+// Survey answers collected here.
+const answers = {};
+
+// ---- Question definitions -------------------------------------------------
+// type: intro | single | state | text | email | thanks
+// terminate: option values that end the survey
+// path: single-choice options may set a branch path
+
+const INTRO = {
+  id: "intro",
+  type: "intro"
+};
+
+// Screener + shared questions, in order. Branching handled by next().
+const QUESTIONS = {
+  intro: INTRO,
+
+  S1: {
+    id: "S1", tag: "S1", type: "single",
+    q: "Hiện tại bạn có đang sống tại Mỹ không?",
+    options: [
+      { v: "yes", label: "Có" },
+      { v: "no", label: "Không", terminate: true }
+    ]
+  },
+
+  S1b: {
+    id: "S1b", tag: "S1b", type: "state",
+    q: "Bạn đang sống ở tiểu bang nào?"
+  },
+
+  S2: {
+    id: "S2", tag: "S2", type: "single",
+    q: "Điều nào sau đây mô tả đúng nhất mối quan hệ của bạn với tiếng Việt?",
+    hint: "Chọn một",
+    options: [
+      { v: "fluent", label: "Tôi lớn lên nói tiếng Việt và nói thành thạo hoặc gần như thành thạo" },
+      { v: "heritage_learning", label: "Gia đình tôi là người Việt / tôi có gốc Việt nhưng chỉ hiểu được một chút — tôi đã từng học, đang học, hoặc dự định học (lại)" },
+      { v: "learner", label: "Tôi không có gốc Việt, nhưng tôi đang học hoặc muốn học tiếng Việt" },
+      { v: "heritage_uninterested", label: "Tôi có gốc Việt nhưng không quan tâm đến tiếng Việt", terminate: true },
+      { v: "none", label: "Tôi không có mối liên hệ nào với tiếng Việt và cũng không quan tâm", terminate: true }
+    ]
+  },
+
+  S3: {
+    id: "S3", tag: "S3", type: "single",
+    q: "Trong 12 tháng qua, bạn đọc manga (bằng bất kỳ ngôn ngữ) thường xuyên như thế nào?",
+    options: [
+      { v: "several_week", label: "Vài lần một tuần trở lên" },
+      { v: "once_week", label: "Khoảng một lần một tuần" },
+      { v: "several_month", label: "Vài lần một tháng" },
+      { v: "once_month", label: "Khoảng một lần một tháng" },
+      { v: "less_month", label: "Ít hơn một lần một tháng" },
+      { v: "none", label: "Tôi chưa đọc manga trong 12 tháng qua", terminate: true }
+    ]
+  },
+
+  S4: {
+    id: "S4", tag: "S4", type: "single",
+    q: "Bạn có đọc manga bằng tiếng Việt không?",
+    options: [
+      { v: "yes", label: "Có, tôi có đọc manga bằng tiếng Việt", path: "A" },
+      { v: "want", label: "Không, nhưng tôi muốn đọc bằng tiếng Việt", path: "B" },
+      { v: "no", label: "Không, và tôi không quan tâm đến manga tiếng Việt", terminate: true }
+    ]
+  },
+
+  // ---- PATH A ----
+  A1: {
+    id: "A1", tag: "A1", type: "single",
+    q: "Trong 12 tháng qua, bạn đã chi khoảng bao nhiêu tiền để mua manga bằng tiếng Việt?",
+    options: [
+      { v: "0", label: "$0" },
+      { v: "u25", label: "Dưới $25" },
+      { v: "25_100", label: "$25–100" },
+      { v: "100_300", label: "$100–300" },
+      { v: "300plus", label: "$300 trở lên" },
+      { v: "na", label: "Không muốn trả lời" }
+    ]
+  },
+  A2: {
+    id: "A2", tag: "A2", type: "single",
+    q: "Cuốn gần đây nhất bạn đọc, bạn có được bằng cách nào?",
+    options: [
+      { v: "print_viet_store", label: "Mua bản in — hiệu sách Việt ở Mỹ" },
+      { v: "print_regular_store", label: "Mua bản in — hiệu sách thông thường ở Mỹ (trực tuyến hoặc trực tiếp)" },
+      { v: "print_intl_ship", label: "Mua bản in — đặt từ Việt Nam và ship quốc tế" },
+      { v: "print_carried", label: "Mua bản in — do tôi hoặc người nhà mang từ Việt Nam sang" },
+      { v: "digital", label: "Mua bản điện tử — từ ứng dụng hoặc cửa hàng trực tuyến" },
+      { v: "free_official", label: "Đọc miễn phí — nguồn chính thức/hợp pháp (kể cả thư viện)" },
+      { v: "free_fan", label: "Đọc miễn phí — trang hoặc ứng dụng dịch của fan (không chính thức)" },
+      { v: "borrow", label: "Mượn từ bạn bè hoặc người thân" },
+      { v: "other", label: "Khác (vui lòng ghi rõ):", other: true }
+    ]
+  },
+  A3: {
+    id: "A3", tag: "A3", type: "single",
+    q: "Điều gì cản trở bạn nhiều nhất trong việc đọc manga tiếng Việt?",
+    hint: "Chọn một",
+    options: [
+      { v: "not_enough_titles", label: "Không có đủ tựa truyện" },
+      { v: "hard_to_find", label: "Khó tìm / không biết mua ở đâu" },
+      { v: "expensive", label: "Quá đắt hoặc phí ship quá cao" },
+      { v: "prefer_other_lang", label: "Tôi thích đọc bằng ngôn ngữ khác hơn" },
+      { v: "no_barriers", label: "Tôi đọc thoải mái theo ý muốn — không có gì cản trở" },
+      { v: "other", label: "Khác (vui lòng ghi rõ):", other: true }
+    ]
+  },
+
+  // ---- PATH B ----
+  B1: {
+    id: "B1", tag: "B1", type: "single",
+    q: "Điều gì chủ yếu khiến bạn chưa đọc manga bằng tiếng Việt?",
+    hint: "Chọn một",
+    options: [
+      { v: "dont_know_where", label: "Không biết tìm ở đâu" },
+      { v: "titles_unavailable", label: "Những tựa truyện tôi muốn chưa có bản tiếng Việt" },
+      { v: "expensive", label: "Quá đắt hoặc phí ship là trở ngại" },
+      { v: "reading_ability", label: "Khả năng đọc tiếng Việt của tôi chưa đủ tốt" },
+      { v: "no_chance", label: "Chỉ là chưa có dịp" },
+      { v: "other", label: "Khác:", other: true }
+    ]
+  },
+  B2: {
+    id: "B2", tag: "B2", type: "single",
+    q: "Trong 12 tháng qua, bạn đã chi khoảng bao nhiêu tiền để mua manga (bằng bất kỳ ngôn ngữ nào)?",
+    options: [
+      { v: "0", label: "$0" },
+      { v: "u25", label: "Dưới $25" },
+      { v: "25_100", label: "$25–100" },
+      { v: "100_300", label: "$100–300" },
+      { v: "300plus", label: "$300 trở lên" },
+      { v: "na", label: "Không muốn trả lời" }
+    ]
+  },
+  B3: {
+    id: "B3", tag: "B3", type: "single",
+    q: "Cuốn gần đây nhất bạn đọc, bạn có được bằng cách nào?",
+    options: [
+      { v: "print_regular_store", label: "Mua bản in — hiệu sách thông thường (trực tuyến hoặc trực tiếp)" },
+      { v: "digital", label: "Mua bản điện tử — từ ứng dụng hoặc cửa hàng trực tuyến" },
+      { v: "free_official", label: "Đọc miễn phí — nguồn chính thức/hợp pháp (kể cả thư viện)" },
+      { v: "free_fan", label: "Đọc miễn phí — trang hoặc ứng dụng dịch của người hâm mộ (không chính thức)" },
+      { v: "borrow", label: "Mượn từ bạn bè hoặc người thân" },
+      { v: "other", label: "Khác (vui lòng ghi rõ):", other: true }
+    ]
+  },
+
+  // ---- Contact ----
+  C1: {
+    id: "C1", tag: "C1", type: "pitch",
+    q: "Chúng tôi đang xây dựng một cửa hàng manga tiếng Việt mới tại Mỹ.",
+    body: "Nếu bạn để lại email, bạn sẽ nhận được ưu đãi giảm giá dành cho khách hàng sớm khi chúng tôi ra mắt.",
+    emailHint: "Chúng tôi chỉ email cho bạn về việc ra mắt và ưu đãi giảm giá của bạn thôi!"
+  },
+  C2: {
+    id: "C2", tag: "C2", type: "text",
+    q: "Bạn muốn chúng tôi có sẵn hoặc cung cấp điều gì nhất?",
+    hint: "Không bắt buộc — nhưng chúng tôi rất muốn nghe ý kiến của bạn.",
+    optional: true
+  }
+};
+
+// Ordered flow used for progress + navigation history.
+function nextId(currentId) {
+  switch (currentId) {
+    case "intro": return "S1";
+    case "S1":    return "S1b";
+    case "S1b":   return "S2";
+    case "S2":    return "S3";
+    case "S3":    return "S4";
+    case "S4":    return answers.S4 === "want" ? "B1" : "A1";
+    case "A1":    return "A2";
+    case "A2":    return "A3";
+    case "A3":    return "C1";
+    case "B1":    return "B2";
+    case "B2":    return "B3";
+    case "B3":    return "C1";
+    case "C1":    return "C2";
+    case "C2":    return "__done";
+    default:      return "__done";
+  }
+}
+
+// Approx progress weighting: intro + 8 questions in the longest path + contact.
+const PROGRESS_STEPS = ["S1","S1b","S2","S3","S4","P1","P2","P3","C1","C2"];
+function progressFor(id) {
+  const map = { A1:"P1", A2:"P2", A3:"P3", B1:"P1", B2:"P2", B3:"P3" };
+  const key = map[id] || id;
+  const idx = PROGRESS_STEPS.indexOf(key);
+  if (idx < 0) return 0;
+  return Math.round(((idx + 1) / PROGRESS_STEPS.length) * 100);
+}
+
+const history = [];
+let currentId = "intro";
+
+const stage = document.getElementById("stage");
+const progressWrap = document.getElementById("progressBar");
+const progressBar = progressWrap.querySelector("span");
+const footer = document.getElementById("footer");
+
+function setProgress(id) {
+  if (id === "intro") { progressWrap.hidden = true; return; }
+  progressWrap.hidden = false;
+  progressBar.style.width = progressFor(id) + "%";
+}
+
+// ---- Renderers ------------------------------------------------------------
+
+function render(id) {
+  currentId = id;
+  setProgress(id);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  const q = QUESTIONS[id];
+
+  if (id === "intro") return renderIntro();
+  if (q.type === "single") return renderSingle(q);
+  if (q.type === "state") return renderState(q);
+  if (q.type === "pitch") return renderPitch(q);
+  if (q.type === "text") return renderText(q);
+}
+
+function renderIntro() {
+  stage.innerHTML = `
+    <div class="intro">
+      <p class="lead"><strong>Xin chào!</strong></p>
+      <p>Chúng tôi là những người sắp mở hiệu sách ở Mỹ chuyên về manga và văn học tiếng Việt.
+         Mong bạn giúp chúng tôi hiểu rõ hơn nhu cầu của độc giả đọc tiếng Việt.</p>
+      <p>Để cảm ơn, bạn sẽ nhận được ưu đãi giảm giá dành cho khách hàng sớm khi chúng tôi ra mắt trang web.</p>
+      <p style="font-size:13px;">Khảo sát chỉ mất khoảng 2 phút.</p>
+    </div>
+    <div class="nav">
+      <span></span>
+      <button class="btn-primary" id="startBtn">Bắt đầu</button>
+    </div>`;
+  document.getElementById("startBtn").onclick = () => go(nextId("intro"));
+  footer.textContent = "";
+}
+
+function renderSingle(q) {
+  const saved = answers[q.id];
+  const savedOther = answers[q.id + "_other"] || "";
+  stage.innerHTML = `
+    <span class="qtag">${q.tag}</span>
+    <p class="qtext">${q.q}</p>
+    ${q.hint ? `<p class="qhint">${q.hint}</p>` : ""}
+    <div class="options">
+      ${q.options.map((o, i) => `
+        <label class="opt" data-v="${o.v}">
+          <input type="radio" name="opt" value="${o.v}" ${saved === o.v ? "checked" : ""} />
+          <span class="txt">${o.label}</span>
+        </label>
+        ${o.other ? `<input class="other-input" type="text" id="otherInput"
+            placeholder="Vui lòng ghi rõ…" value="${escapeAttr(savedOther)}"
+            ${saved === o.v ? "" : "hidden"} />` : ""}
+      `).join("")}
+    </div>
+    ${navHtml(true)}`;
+  wireBack();
+
+  const nextBtn = document.getElementById("nextBtn");
+  const otherInput = document.getElementById("otherInput");
+
+  function refresh() {
+    const sel = stage.querySelector('input[name="opt"]:checked');
+    stage.querySelectorAll(".opt").forEach(l => l.classList.toggle("checked", l.dataset.v === (sel && sel.value)));
+    const selOpt = sel ? q.options.find(o => o.v === sel.value) : null;
+    if (otherInput) {
+      const showOther = selOpt && selOpt.other;
+      otherInput.hidden = !showOther;
+      if (showOther) otherInput.focus({ preventScroll: true });
+    }
+    const needsOther = selOpt && selOpt.other;
+    nextBtn.disabled = !sel || (needsOther && !otherInput.value.trim());
+  }
+
+  stage.querySelectorAll('input[name="opt"]').forEach(r => r.addEventListener("change", refresh));
+  if (otherInput) otherInput.addEventListener("input", refresh);
+  refresh();
+
+  nextBtn.onclick = () => {
+    const sel = stage.querySelector('input[name="opt"]:checked');
+    if (!sel) return;
+    const opt = q.options.find(o => o.v === sel.value);
+    answers[q.id] = sel.value;
+    answers[q.id + "_label"] = opt.label;
+    if (opt.other) answers[q.id + "_other"] = otherInput.value.trim();
+    else delete answers[q.id + "_other"];
+
+    if (opt.terminate) return terminate();
+    go(nextId(q.id));
+  };
+}
+
+function renderState(q) {
+  const saved = answers[q.id] || "";
+  stage.innerHTML = `
+    <span class="qtag">${q.tag}</span>
+    <p class="qtext">${q.q}</p>
+    <select id="stateSel">
+      <option value="" ${saved ? "" : "selected"} disabled>— Chọn tiểu bang —</option>
+      ${US_STATES.map(s => `<option value="${s}" ${saved === s ? "selected" : ""}>${s}</option>`).join("")}
+    </select>
+    ${navHtml(true)}`;
+  wireBack();
+  const sel = document.getElementById("stateSel");
+  const nextBtn = document.getElementById("nextBtn");
+  const refresh = () => { nextBtn.disabled = !sel.value; };
+  sel.addEventListener("change", refresh);
+  refresh();
+  nextBtn.onclick = () => {
+    if (!sel.value) return;
+    answers[q.id] = sel.value;
+    go(nextId(q.id));
+  };
+}
+
+function renderPitch(q) {
+  const saved = answers.email || "";
+  stage.innerHTML = `
+    <p class="pitch-title">${q.q}</p>
+    <p class="pitch-body">${q.body}</p>
+    <label class="pitch-label" for="emailInput">Email của bạn (không bắt buộc)</label>
+    <input type="email" id="emailInput" placeholder="ban@example.com"
+           autocomplete="email" value="${escapeAttr(saved)}" />
+    <p class="qhint">${q.emailHint}</p>
+    <p class="qhint" id="emailErr" style="color:var(--brand);" hidden>Vui lòng nhập địa chỉ email hợp lệ, hoặc để trống.</p>
+    ${navHtml(true, "Tiếp tục →")}`;
+  wireBack();
+  const input = document.getElementById("emailInput");
+  const err = document.getElementById("emailErr");
+  const nextBtn = document.getElementById("nextBtn");
+  const valid = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  input.addEventListener("input", () => { err.hidden = true; });
+  nextBtn.onclick = () => {
+    const v = input.value.trim();
+    // Email is optional — but if provided it must be valid.
+    if (v && !valid(v)) { err.hidden = false; return; }
+    answers.email = v;
+    go(nextId(q.id));
+  };
+}
+
+function renderText(q) {
+  const saved = answers[q.id] || "";
+  stage.innerHTML = `
+    <span class="qtag">${q.tag}</span>
+    <p class="qtext">${q.q}</p>
+    ${q.hint ? `<p class="qhint">${q.hint}</p>` : ""}
+    <textarea class="text-input" id="textInput" placeholder="Ý kiến của bạn…">${escapeHtml(saved)}</textarea>
+    ${navHtml(true, q.optional ? "Gửi khảo sát" : "Tiếp tục")}`;
+  wireBack();
+  const input = document.getElementById("textInput");
+  const nextBtn = document.getElementById("nextBtn");
+  if (q.optional) nextBtn.disabled = false;
+  else {
+    const refresh = () => { nextBtn.disabled = !input.value.trim(); };
+    input.addEventListener("input", refresh);
+    refresh();
+  }
+  nextBtn.onclick = () => {
+    answers[q.id] = input.value.trim();
+    go(nextId(q.id));
+  };
+}
+
+// ---- Navigation helpers ---------------------------------------------------
+
+function navHtml(showBack, nextLabel) {
+  return `
+    <div class="nav">
+      ${showBack ? `<button class="btn-ghost" id="backBtn">← Quay lại</button>` : `<span></span>`}
+      <button class="btn-primary" id="nextBtn">${nextLabel || "Tiếp tục"}</button>
+    </div>`;
+}
+
+function wireBack() {
+  const b = document.getElementById("backBtn");
+  if (b) b.onclick = back;
+}
+
+function go(id) {
+  if (id === "__done") return finish();
+  history.push(currentId);
+  render(id);
+}
+
+function back() {
+  if (!history.length) return;
+  const prev = history.pop();
+  render(prev);
+}
+
+function terminate() {
+  setProgress("__end");
+  progressWrap.hidden = true;
+  stage.innerHTML = `
+    <div class="center-msg">
+      <div class="emoji">🙏</div>
+      <h2>Cảm ơn bạn đã dành thời gian!</h2>
+      <p>Dựa trên câu trả lời của bạn, khảo sát này không phù hợp lắm — nhưng chúng tôi thật sự
+         trân trọng sự quan tâm của bạn. Chúc bạn một ngày tốt lành!</p>
+    </div>`;
+  footer.textContent = "";
+}
+
+function finish() {
+  saveResponse();
+  progressBar.style.width = "100%";
+  stage.innerHTML = `
+    <div class="center-msg">
+      <div class="spinner"></div>
+      <h2>Cảm ơn bạn rất nhiều!</h2>
+      <p>Đang chuyển bạn đến trang nhận ưu đãi…</p>
+    </div>`;
+  footer.innerHTML = `Nếu trang không tự chuyển, <a href="${REDIRECT_URL}">bấm vào đây</a>.`;
+  setTimeout(() => { window.location.href = REDIRECT_URL; }, 1400);
+}
+
+// Static site: no backend. Persist the response locally so it isn't lost,
+// and expose a hook where a real endpoint could be wired in later.
+function saveResponse() {
+  answers.completed_at = new Date().toISOString();
+  try {
+    const key = "manga_survey_responses";
+    const all = JSON.parse(localStorage.getItem(key) || "[]");
+    all.push(answers);
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (e) { /* storage unavailable — ignore */ }
+
+  // To collect responses centrally, POST `answers` to your endpoint here, e.g.:
+  // navigator.sendBeacon("/api/survey", JSON.stringify(answers));
+}
+
+// ---- Utils ----------------------------------------------------------------
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+function escapeAttr(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---- Boot -----------------------------------------------------------------
+render("intro");
+</script>
+</body>
+</html>
