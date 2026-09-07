@@ -84,9 +84,32 @@
   .qtext { font-size: 18px; font-weight: 650; margin: 0 0 4px; }
   .qhint { font-size: 13px; color: var(--muted); margin: 0 0 18px; }
 
-  .pitch-title { font-size: 24px; font-weight: 750; line-height: 1.3; margin: 4px 0 14px; }
-  .pitch-body { font-size: 17px; color: var(--ink); margin: 0 0 22px; }
+  .pitch-title { font-size: 22px; font-weight: 750; line-height: 1.3; margin: 4px 0 12px; }
+  .pitch-body { font-size: 16px; color: var(--ink); margin: 0 0 18px; }
   .pitch-label { display: block; font-size: 14px; font-weight: 650; margin-bottom: 2px; }
+
+  /* Combined form page */
+  .form-lead { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+  .form-section { padding: 22px 0; border-top: 1px solid var(--line); }
+  .form-section:first-of-type { border-top: none; padding-top: 8px; }
+  .form-section .qtext { font-size: 17px; }
+  .pitch-section { background: var(--accent); border-radius: 12px; padding: 20px 18px; border-top: none; margin-top: 8px; }
+  .pitch-section .pitch-title { font-size: 19px; }
+
+  /* State autocomplete combobox */
+  .combo { position: relative; }
+  .combo-list {
+    list-style: none; margin: 6px 0 0; padding: 4px;
+    border: 1.5px solid var(--line); border-radius: 10px; background: #fff;
+    box-shadow: var(--shadow); max-height: 240px; overflow-y: auto;
+    position: absolute; left: 0; right: 0; z-index: 20;
+  }
+  .combo-opt {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 15px;
+  }
+  .combo-opt:hover, .combo-opt.active { background: var(--accent); }
+  .combo-code { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .05em; }
 
   .options { display: flex; flex-direction: column; gap: 10px; }
   .opt {
@@ -185,8 +208,6 @@
 <script>
 "use strict";
 
-const REDIRECT_URL = "https://notnotgood.kit.com/d5acb4e9b2";
-
 // Google Apps Script Web App URL — paste the /exec URL you get after deploying
 // the Apps Script (see the setup notes). Leave "" to disable syncing.
 const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbwIvLoB6f0r0-uRn8-NlTDL5stz-mH8rpAXevQbRHuAgzOh8XyNfRNT6HthsN4dwDms/exec";
@@ -197,15 +218,43 @@ const responseId = (crypto && crypto.randomUUID)
   : "r" + Date.now() + Math.random().toString(36).slice(2);
 
 const US_STATES = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
-  "Delaware","District of Columbia","Florida","Georgia","Hawaii","Idaho","Illinois",
-  "Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts",
-  "Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
-  "New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota",
-  "Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina",
-  "South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington",
-  "West Virginia","Wisconsin","Wyoming"
-];
+  ["Alabama","AL"],["Alaska","AK"],["Arizona","AZ"],["Arkansas","AR"],
+  ["California","CA"],["Colorado","CO"],["Connecticut","CT"],["Delaware","DE"],
+  ["District of Columbia","DC"],["Florida","FL"],["Georgia","GA"],["Hawaii","HI"],
+  ["Idaho","ID"],["Illinois","IL"],["Indiana","IN"],["Iowa","IA"],["Kansas","KS"],
+  ["Kentucky","KY"],["Louisiana","LA"],["Maine","ME"],["Maryland","MD"],
+  ["Massachusetts","MA"],["Michigan","MI"],["Minnesota","MN"],["Mississippi","MS"],
+  ["Missouri","MO"],["Montana","MT"],["Nebraska","NE"],["Nevada","NV"],
+  ["New Hampshire","NH"],["New Jersey","NJ"],["New Mexico","NM"],["New York","NY"],
+  ["North Carolina","NC"],["North Dakota","ND"],["Ohio","OH"],["Oklahoma","OK"],
+  ["Oregon","OR"],["Pennsylvania","PA"],["Rhode Island","RI"],["South Carolina","SC"],
+  ["South Dakota","SD"],["Tennessee","TN"],["Texas","TX"],["Utah","UT"],
+  ["Vermont","VT"],["Virginia","VA"],["Washington","WA"],["West Virginia","WV"],
+  ["Wisconsin","WI"],["Wyoming","WY"]
+].map(([name, code]) => ({ name, code }));
+
+// Resolve free-typed input to a state name: exact name match or 2-letter code.
+function resolveState(query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return null;
+  const byCode = US_STATES.find(s => s.code.toLowerCase() === q);
+  if (byCode) return byCode.name;
+  const byName = US_STATES.find(s => s.name.toLowerCase() === q);
+  return byName ? byName.name : null;
+}
+
+// States matching a partial query, for the autocomplete dropdown.
+function filterStates(query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return US_STATES.slice();
+  const starts = [], contains = [];
+  for (const s of US_STATES) {
+    const name = s.name.toLowerCase(), code = s.code.toLowerCase();
+    if (code === q || name.startsWith(q)) starts.push(s);
+    else if (name.includes(q)) contains.push(s);
+  }
+  return starts.concat(contains);
+}
 
 // Survey answers collected here.
 const answers = {};
@@ -378,25 +427,17 @@ function nextId(currentId) {
     case "S1b":   return "S2";
     case "S2":    return "S3";
     case "S3":    return "S4";
-    case "S4":    return answers.S4 === "want" ? "B1" : "A1";
-    case "A1":    return "A2";
-    case "A2":    return "A3";
-    case "A3":    return "C1";
-    case "B1":    return "B2";
-    case "B2":    return "B3";
-    case "B3":    return "C1";
-    case "C1":    return "C2";
-    case "C2":    return "__done";
+    // Screeners done → everything else lives on one page.
+    case "S4":    return "form";
+    case "form":  return "__done";
     default:      return "__done";
   }
 }
 
-// Approx progress weighting: intro + 8 questions in the longest path + contact.
-const PROGRESS_STEPS = ["S1","S1b","S2","S3","S4","P1","P2","P3","C1","C2"];
+// Progress across the screeners, then the single combined form page.
+const PROGRESS_STEPS = ["S1", "S1b", "S2", "S3", "S4", "form"];
 function progressFor(id) {
-  const map = { A1:"P1", A2:"P2", A3:"P3", B1:"P1", B2:"P2", B3:"P3" };
-  const key = map[id] || id;
-  const idx = PROGRESS_STEPS.indexOf(key);
+  const idx = PROGRESS_STEPS.indexOf(id);
   if (idx < 0) return 0;
   return Math.round(((idx + 1) / PROGRESS_STEPS.length) * 100);
 }
@@ -421,13 +462,13 @@ function render(id) {
   currentId = id;
   setProgress(id);
   window.scrollTo({ top: 0, behavior: "smooth" });
-  const q = QUESTIONS[id];
 
   if (id === "intro") return renderIntro();
+  if (id === "form") return renderForm();
+
+  const q = QUESTIONS[id];
   if (q.type === "single") return renderSingle(q);
   if (q.type === "state") return renderState(q);
-  if (q.type === "pitch") return renderPitch(q);
-  if (q.type === "text") return renderText(q);
 }
 
 function renderIntro() {
@@ -502,76 +543,223 @@ function renderSingle(q) {
   };
 }
 
+// Screener S1b — a typed combobox that enforces one of the 50 states.
+// Accepts full names and 2-letter codes (CA → California); free text that
+// doesn't resolve to a state is rejected.
 function renderState(q) {
   const saved = answers[q.id] || "";
   stage.innerHTML = `
     <span class="qtag">${q.tag}</span>
     <p class="qtext">${q.q}</p>
-    <select id="stateSel">
-      <option value="" ${saved ? "" : "selected"} disabled>— Chọn tiểu bang —</option>
-      ${US_STATES.map(s => `<option value="${s}" ${saved === s ? "selected" : ""}>${s}</option>`).join("")}
-    </select>
+    <p class="qhint">Gõ tên tiểu bang hoặc mã 2 chữ cái (ví dụ: CA), rồi chọn từ danh sách.</p>
+    <div class="combo">
+      <input type="text" id="stateInput" class="text-input" autocomplete="off"
+             placeholder="Nhập tiểu bang…" value="${escapeAttr(saved)}" />
+      <ul class="combo-list" id="stateList" hidden></ul>
+    </div>
+    <p class="qhint" id="stateErr" style="color:var(--brand);" hidden>Vui lòng chọn một tiểu bang trong danh sách.</p>
     ${navHtml(true)}`;
   wireBack();
-  const sel = document.getElementById("stateSel");
-  const nextBtn = document.getElementById("nextBtn");
-  const refresh = () => { nextBtn.disabled = !sel.value; };
-  sel.addEventListener("change", refresh);
-  refresh();
-  nextBtn.onclick = () => {
-    if (!sel.value) return;
-    answers[q.id] = sel.value;
-    go(nextId(q.id));
-  };
-}
 
-function renderPitch(q) {
-  const saved = answers.email || "";
-  stage.innerHTML = `
-    <p class="pitch-title">${q.q}</p>
-    <p class="pitch-body">${q.body}</p>
-    <label class="pitch-label" for="emailInput">Email của bạn (không bắt buộc)</label>
-    <input type="email" id="emailInput" placeholder="ban@example.com"
-           autocomplete="email" value="${escapeAttr(saved)}" />
-    <p class="qhint">${q.emailHint}</p>
-    <p class="qhint" id="emailErr" style="color:var(--brand);" hidden>Vui lòng nhập địa chỉ email hợp lệ, hoặc để trống.</p>
-    ${navHtml(true, "Tiếp tục →")}`;
-  wireBack();
-  const input = document.getElementById("emailInput");
-  const err = document.getElementById("emailErr");
+  const input = document.getElementById("stateInput");
+  const list = document.getElementById("stateList");
+  const err = document.getElementById("stateErr");
   const nextBtn = document.getElementById("nextBtn");
-  const valid = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-  input.addEventListener("input", () => { err.hidden = true; });
-  nextBtn.onclick = () => {
-    const v = input.value.trim();
-    // Email is optional — but if provided it must be valid.
-    if (v && !valid(v)) { err.hidden = false; return; }
-    answers.email = v;
-    go(nextId(q.id));
-  };
-}
+  let selected = resolveState(saved);
+  let activeIdx = -1;
 
-function renderText(q) {
-  const saved = answers[q.id] || "";
-  stage.innerHTML = `
-    <span class="qtag">${q.tag}</span>
-    <p class="qtext">${q.q}</p>
-    ${q.hint ? `<p class="qhint">${q.hint}</p>` : ""}
-    <textarea class="text-input" id="textInput" placeholder="Ý kiến của bạn…">${escapeHtml(saved)}</textarea>
-    ${navHtml(true, q.optional ? "Gửi khảo sát" : "Tiếp tục")}`;
-  wireBack();
-  const input = document.getElementById("textInput");
-  const nextBtn = document.getElementById("nextBtn");
-  if (q.optional) nextBtn.disabled = false;
-  else {
-    const refresh = () => { nextBtn.disabled = !input.value.trim(); };
-    input.addEventListener("input", refresh);
-    refresh();
+  const setSelected = (name) => { selected = name; nextBtn.disabled = !selected; };
+  setSelected(selected);
+
+  function renderList() {
+    const typed = input.value.trim().toLowerCase();
+    const matches = filterStates(input.value);
+    activeIdx = -1;
+    // Hide once the field already holds an exact, resolved state.
+    if (!matches.length || (selected && selected.toLowerCase() === typed)) {
+      list.hidden = true; list.innerHTML = ""; return;
+    }
+    list.innerHTML = matches.map((s, i) =>
+      `<li class="combo-opt" data-name="${escapeAttr(s.name)}" data-i="${i}">
+         <span>${s.name}</span><span class="combo-code">${s.code}</span>
+       </li>`).join("");
+    list.hidden = false;
   }
+
+  function choose(name) {
+    input.value = name;
+    setSelected(name);
+    err.hidden = true;
+    list.hidden = true; list.innerHTML = "";
+  }
+
+  function highlight(opts) {
+    opts.forEach((o, i) => o.classList.toggle("active", i === activeIdx));
+    if (activeIdx >= 0) opts[activeIdx].scrollIntoView({ block: "nearest" });
+  }
+
+  input.addEventListener("input", () => {
+    err.hidden = true;
+    setSelected(resolveState(input.value)); // exact name/code counts as valid
+    renderList();
+  });
+  input.addEventListener("focus", renderList);
+  input.addEventListener("keydown", (e) => {
+    const opts = Array.from(list.querySelectorAll(".combo-opt"));
+    if (e.key === "ArrowDown" && opts.length) {
+      e.preventDefault(); activeIdx = Math.min(activeIdx + 1, opts.length - 1); highlight(opts);
+    } else if (e.key === "ArrowUp" && opts.length) {
+      e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); highlight(opts);
+    } else if (e.key === "Enter" && !list.hidden && opts.length) {
+      e.preventDefault(); choose(opts[activeIdx >= 0 ? activeIdx : 0].dataset.name);
+    } else if (e.key === "Escape") {
+      list.hidden = true;
+    }
+  });
+  // mousedown (not click) so it fires before the input's blur.
+  list.addEventListener("mousedown", (e) => {
+    const li = e.target.closest(".combo-opt");
+    if (li) { e.preventDefault(); choose(li.dataset.name); }
+  });
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      list.hidden = true;
+      const r = resolveState(input.value);
+      if (r) { input.value = r; setSelected(r); }
+      else if (input.value.trim()) { setSelected(null); err.hidden = false; }
+    }, 120);
+  });
+
   nextBtn.onclick = () => {
-    answers[q.id] = input.value.trim();
+    const r = resolveState(input.value);
+    if (!r) { setSelected(null); err.hidden = false; return; }
+    answers[q.id] = r;
     go(nextId(q.id));
   };
+}
+
+// ---- Combined page (everything after the screeners) -----------------------
+
+function renderForm() {
+  const path = answers.S4 === "want" ? "B" : "A";
+  const qs = path === "B"
+    ? [QUESTIONS.B1, QUESTIONS.B2, QUESTIONS.B3]
+    : [QUESTIONS.A1, QUESTIONS.A2, QUESTIONS.A3];
+
+  stage.innerHTML = `
+    <p class="form-lead">Gần xong rồi! Vui lòng trả lời vài câu hỏi cuối.</p>
+    ${qs.map(sectionHtml).join("")}
+    <div class="form-section pitch-section">
+      <p class="pitch-title">${QUESTIONS.C1.q}</p>
+      <p class="pitch-body">${QUESTIONS.C1.body}</p>
+      <label class="pitch-label" for="emailInput">Email của bạn (không bắt buộc)</label>
+      <input type="email" id="emailInput" class="text-input" placeholder="ban@example.com"
+             autocomplete="email" value="${escapeAttr(answers.email || "")}" />
+      <p class="qhint">${QUESTIONS.C1.emailHint}</p>
+      <p class="qhint" id="emailErr" style="color:var(--brand);" hidden>Vui lòng nhập email hợp lệ, hoặc để trống.</p>
+    </div>
+    <div class="form-section">
+      <p class="qtext">${QUESTIONS.C2.q}</p>
+      ${QUESTIONS.C2.hint ? `<p class="qhint">${QUESTIONS.C2.hint}</p>` : ""}
+      <textarea class="text-input" id="wishInput" placeholder="Ý kiến của bạn…">${escapeHtml(answers.C2 || "")}</textarea>
+    </div>
+    <div class="nav">
+      <button class="btn-ghost" id="backBtn">← Quay lại</button>
+      <button class="btn-primary" id="submitBtn">Gửi khảo sát</button>
+    </div>
+    <p class="qhint" id="formErr" style="color:var(--brand); text-align:right;" hidden>Vui lòng trả lời tất cả câu hỏi ở trên.</p>`;
+  wireBack();
+
+  const submitBtn = document.getElementById("submitBtn");
+  const emailInput = document.getElementById("emailInput");
+  const emailErr = document.getElementById("emailErr");
+  const wishInput = document.getElementById("wishInput");
+  const formErr = document.getElementById("formErr");
+  const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+  function allAnswered() {
+    return qs.every(q => {
+      const v = answers[q.id];
+      if (v === undefined) return false;
+      const opt = q.options.find(o => o.v === v);
+      if (opt && opt.other && !(answers[q.id + "_other"] || "").trim()) return false;
+      return true;
+    });
+  }
+  function updateState() {
+    submitBtn.disabled = !allAnswered();
+    if (!submitBtn.disabled) formErr.hidden = true;
+  }
+  function readContact() {
+    answers.email = emailInput.value.trim();
+    answers.C2 = wishInput.value.trim();
+  }
+
+  qs.forEach(q => wireSection(q, updateState));
+  updateState();
+
+  emailInput.addEventListener("input", () => { emailErr.hidden = true; });
+  emailInput.addEventListener("blur", () => { readContact(); syncProgress("in_progress"); });
+  wishInput.addEventListener("blur", () => { readContact(); syncProgress("in_progress"); });
+
+  submitBtn.onclick = () => {
+    if (!allAnswered()) { formErr.hidden = false; return; }
+    const em = emailInput.value.trim();
+    if (em && !validEmail(em)) { emailErr.hidden = false; emailInput.focus(); return; }
+    readContact();
+    finish();
+  };
+}
+
+// One single-choice question as a section within the combined form.
+function sectionHtml(q) {
+  return `
+    <div class="form-section" data-qid="${q.id}">
+      <p class="qtext">${q.q}</p>
+      ${q.hint ? `<p class="qhint">${q.hint}</p>` : ""}
+      <div class="options">
+        ${q.options.map(o => `
+          <label class="opt" data-v="${o.v}">
+            <input type="radio" name="opt_${q.id}" value="${o.v}" ${answers[q.id] === o.v ? "checked" : ""} />
+            <span class="txt">${o.label}</span>
+          </label>
+          ${o.other ? `<input class="other-input" type="text" data-other="${q.id}"
+              placeholder="Vui lòng ghi rõ…" value="${escapeAttr(answers[q.id + "_other"] || "")}"
+              ${answers[q.id] === o.v ? "" : "hidden"} />` : ""}
+        `).join("")}
+      </div>
+    </div>`;
+}
+
+function wireSection(q, onChange) {
+  const section = stage.querySelector(`.form-section[data-qid="${q.id}"]`);
+  const radios = section.querySelectorAll('input[type="radio"]');
+  const otherInput = section.querySelector("input[data-other]");
+
+  function refresh(sync) {
+    const sel = section.querySelector('input[type="radio"]:checked');
+    section.querySelectorAll(".opt").forEach(l =>
+      l.classList.toggle("checked", !!sel && l.dataset.v === sel.value));
+    if (sel) {
+      const opt = q.options.find(o => o.v === sel.value);
+      answers[q.id] = sel.value;
+      answers[q.id + "_label"] = opt.label;
+      if (otherInput) {
+        otherInput.hidden = !opt.other;
+        if (opt.other) { answers[q.id + "_other"] = otherInput.value.trim(); if (sync) otherInput.focus(); }
+        else delete answers[q.id + "_other"];
+      }
+    }
+    onChange();
+    if (sync) syncProgress("in_progress");
+  }
+
+  radios.forEach(r => r.addEventListener("change", () => refresh(true)));
+  if (otherInput) {
+    otherInput.addEventListener("input", () => { answers[q.id + "_other"] = otherInput.value.trim(); onChange(); });
+    otherInput.addEventListener("blur", () => syncProgress("in_progress"));
+  }
+  if (answers[q.id] !== undefined) refresh(false); // restore label/checked state
 }
 
 // ---- Navigation helpers ---------------------------------------------------
@@ -621,12 +809,12 @@ function finish() {
   progressBar.style.width = "100%";
   stage.innerHTML = `
     <div class="center-msg">
-      <div class="spinner"></div>
+      <div class="emoji">🎉</div>
       <h2>Cảm ơn bạn rất nhiều!</h2>
-      <p>Đang chuyển bạn đến trang nhận ưu đãi…</p>
+      <p>Câu trả lời của bạn đã được ghi nhận. Nếu bạn để lại email, chúng tôi sẽ liên hệ
+         khi cửa hàng ra mắt — kèm ưu đãi giảm giá dành cho khách hàng sớm.</p>
     </div>`;
-  footer.innerHTML = `Nếu trang không tự chuyển, <a href="${REDIRECT_URL}">bấm vào đây</a>.`;
-  setTimeout(() => { window.location.href = REDIRECT_URL; }, 1400);
+  footer.textContent = "";
 }
 
 // Build a flat, human-readable row from the current answers.
@@ -659,9 +847,16 @@ function withOther(label, other) {
 // Save progress to the spreadsheet after each step. Fire-and-forget: `no-cors`
 // + text/plain avoids a CORS preflight (Apps Script can't send CORS headers),
 // and `keepalive` lets the last save finish as the page redirects away.
+let finalized = false; // set once completed/terminated, to lock the final status
+
 function syncProgress(status) {
   // Nothing answered yet (still on intro) — skip creating an empty row.
   if (status === "in_progress" && answers.S1 === undefined) return;
+  // Once the response is finalized, ignore late "in_progress" saves (e.g. a
+  // field blur fired while the page is being torn down) so they can't overwrite
+  // the completed/terminated status in the sheet.
+  if (finalized && status === "in_progress") return;
+  if (status === "completed" || status === "terminated") finalized = true;
 
   const row = buildRow(status);
 
