@@ -442,13 +442,36 @@ function progressFor(id) {
   return Math.round(((idx + 1) / PROGRESS_STEPS.length) * 100);
 }
 
-const history = [];
 let currentId = "intro";
 
 const stage = document.getElementById("stage");
 const progressWrap = document.getElementById("progressBar");
 const progressBar = progressWrap.querySelector("span");
 const footer = document.getElementById("footer");
+
+// URL slug for each screen — the browser URL changes as the survey progresses,
+// so ad-campaign conversions can be tracked by destination URL.
+// Victory conditions: "/completed" (finished) and "/completed/subscribed"
+// (finished AND left an email — being nested, it also matches "/completed").
+const SLUGS = {
+  intro:  "/",
+  S1:     "/us-resident",
+  S1b:    "/state",
+  S2:     "/vietnamese",
+  S3:     "/reading-habits",
+  S4:     "/vietnamese-manga",
+  form:   "/questions",
+  end:    "/not-eligible",         // screened out
+  done:   "/completed",            // VICTORY 1: survey completed
+  subscribed: "/completed/subscribed", // VICTORY 2: email provided
+};
+
+// pushState in a try/catch so the survey still works where History is
+// restricted (e.g. opened directly as a file:// page).
+function pushUrl(id, slug) {
+  try { window.history.pushState({ id }, "", slug || SLUGS[id] || "/"); }
+  catch (e) { /* history unavailable — navigation still works */ }
+}
 
 function setProgress(id) {
   if (id === "intro") { progressWrap.hidden = true; return; }
@@ -465,6 +488,8 @@ function render(id) {
 
   if (id === "intro") return renderIntro();
   if (id === "form") return renderForm();
+  if (id === "done" || id === "subscribed") return showThanks();
+  if (id === "end") return showTerminate();
 
   const q = QUESTIONS[id];
   if (q.type === "single") return renderSingle(q);
@@ -780,17 +805,28 @@ function wireBack() {
 function go(id) {
   if (id === "__done") return finish();
   syncProgress("in_progress");   // save whatever has been answered so far
-  history.push(currentId);
+  pushUrl(id);                   // browser URL reflects the new step
   render(id);
 }
 
+// The "Quay lại" button and the browser Back button share one path: pop the
+// browser history, and the popstate handler renders the previous screen.
 function back() {
-  if (!history.length) return;
-  const prev = history.pop();
-  render(prev);
+  window.history.back();
 }
 
+window.addEventListener("popstate", (e) => {
+  const id = (e.state && e.state.id) || "intro";
+  render(id);
+});
+
 function terminate() {
+  pushUrl("end");                // → /not-eligible
+  showTerminate();
+  syncProgress("terminated");
+}
+
+function showTerminate() {
   setProgress("__end");
   progressWrap.hidden = true;
   stage.innerHTML = `
@@ -801,11 +837,19 @@ function terminate() {
          trân trọng sự quan tâm của bạn. Chúc bạn một ngày tốt lành!</p>
     </div>`;
   footer.textContent = "";
-  syncProgress("terminated");
 }
 
 function finish() {
   syncProgress("completed");
+  // VICTORY 1: everyone who submits reaches /completed.
+  pushUrl("done");
+  // VICTORY 2: if they left an email, also reach /completed/subscribed
+  // (nested, so it still matches the /completed rule too).
+  if ((answers.email || "").trim()) pushUrl("subscribed");
+  showThanks();
+}
+
+function showThanks() {
   progressBar.style.width = "100%";
   stage.innerHTML = `
     <div class="center-msg">
@@ -885,6 +929,9 @@ function escapeAttr(s) {
 }
 
 // ---- Boot -----------------------------------------------------------------
+// Normalize the URL to "/" on entry (any deep link, e.g. a stale /completed,
+// starts the survey fresh) and seed history so Back has a base to return to.
+try { window.history.replaceState({ id: "intro" }, "", "/"); } catch (e) {}
 render("intro");
 </script>
 </body>
